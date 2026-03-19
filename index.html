@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>뽀모도로 타이머</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f5f6f8;--surface:#fff;--border:#e4e7ec;--text:#1a1d23;
+    --text2:#6b7280;--primary:#3b5bd5;--primary-hover:#2f4abb;--primary-bg:#eef1fe;
+    --danger:#dc2626;--success:#0f7b5f;--orange:#b45309;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg:0 4px 16px rgba(0,0,0,.08);
+    --radius:16px;--radius-sm:10px;
+    --focus-ring:0 0 0 3px rgba(59,91,213,.3);
+    --tomato-outline:#5a7247;--tomato-leaf:#4a8c3f;
+    --coffee-body:#8B6F47;--coffee-fill:#6F4E37;--coffee-dark:#3E2723;
+    --glow:none;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#13141a;--surface:#1e1f26;--border:#2e303a;--text:#e4e5eb;
+      --text2:#9a9ba3;--primary:#7b9aff;--primary-hover:#97b0ff;--primary-bg:#252640;
+      --danger:#f87171;--success:#34d399;--orange:#fbbf24;
+      --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 4px 16px rgba(0,0,0,.4);
+      --tomato-outline:#6b8a5a;--tomato-leaf:#5aad4a;
+      --coffee-body:#a08060;--coffee-fill:#8B6F47;--coffee-dark:#5D4037;
+    }
+  }
+  html{font-size:16px}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+  /* Header */
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;height:56px;position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:8px;font-size:1.1rem;font-weight:700;color:var(--primary);margin-right:auto}
+  .logo svg{width:24px;height:24px}
+  .harvest{display:flex;align-items:center;gap:2px;margin-right:16px;font-size:.85rem;min-height:32px}
+  .harvest-tomato{width:18px;height:18px;opacity:.85;transition:transform .2s}
+  .harvest-tomato:last-of-type{animation:pop-in .3s ease}
+  @keyframes pop-in{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+  .harvest-count{font-weight:700;color:var(--text2);font-size:.8rem;margin-left:2px}
+
+  /* Nav */
+  .nav{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:var(--radius-sm)}
+  .nav-btn{background:none;border:none;padding:10px 18px;font-size:.85rem;font-weight:500;color:var(--text2);cursor:pointer;border-radius:8px;transition:.15s;min-height:44px}
+  .nav-btn:hover{color:var(--text)}
+  .nav-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  /* Main */
+  main{max-width:560px;margin:0 auto;padding:24px 16px 80px}
+  .page{display:none}.page.active{display:block}
+
+  /* Timer Page */
+  .page.active.timer-page{display:flex;flex-direction:column;align-items:center;gap:8px}
+
+  /* SVG Container */
+  .svg-wrap{position:relative;width:220px;height:220px;margin:8px 0}
+  @media(prefers-color-scheme:dark){
+    .svg-wrap.work{filter:drop-shadow(0 0 24px rgba(239,68,68,.2))}
+    .svg-wrap.break{filter:drop-shadow(0 0 24px rgba(180,140,60,.25))}
+  }
+
+  /* Phase Label */
+  .phase-label{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-top:4px}
+  .phase-label.work{color:var(--orange)}
+  .phase-label.break{color:var(--primary)}
+
+  /* Time Display */
+  .time-display{font-size:3.2rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1;color:var(--text)}
+
+  /* Cycle Dots */
+  .cycle-dots{display:flex;gap:8px;align-items:center;margin:4px 0 12px}
+  .cycle-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--border);transition:all .3s}
+  .cycle-dot.done{background:var(--success);border-color:var(--success)}
+  .cycle-dot.active{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,91,213,.2)}
+  .cycle-dot.active.work{border-color:var(--orange);box-shadow:0 0 0 3px rgba(180,83,9,.15)}
+
+  /* Controls */
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:4px 0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 24px;border:none;border-radius:var(--radius-sm);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s;min-height:48px}
+  .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-success{background:var(--success);color:#fff}
+  .btn-ghost{background:transparent;color:var(--text2);border:1.5px solid var(--border)}.btn-ghost:hover{background:var(--bg);color:var(--text)}
+  .btn-sm{padding:8px 16px;font-size:.8rem;min-height:40px}
+  .btn-lg{padding:14px 36px;font-size:1rem;min-height:52px;border-radius:var(--radius)}
+
+  /* Sound Row */
+  .sound-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .sound-row select{padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.8rem;background:var(--surface);color:var(--text);cursor:pointer;min-height:36px}
+  .sound-row select:focus-visible{border-color:var(--primary);box-shadow:var(--focus-ring)}
+  .sound-row select:focus:not(:focus-visible){outline:none}
+  .sound-preview{width:36px;height:36px;border:none;background:none;cursor:pointer;color:var(--text2);border-radius:8px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .sound-preview:hover{background:var(--primary-bg);color:var(--primary)}
+
+  /* Transition Overlay */
+  .transition{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
+  .transition.active{opacity:1;pointer-events:auto}
+  @media(prefers-color-scheme:dark){.transition{background:rgba(0,0,0,.6)}}
+  .transition-card{background:var(--surface);border-radius:20px;padding:40px;text-align:center;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+  .transition-icon{font-size:4rem;margin-bottom:12px}
+  .transition-title{font-size:1.4rem;font-weight:800;margin-bottom:4px}
+  .transition-sub{font-size:.95rem;color:var(--text2);margin-bottom:16px}
+  .transition-countdown{font-size:.85rem;color:var(--text2);margin-bottom:20px;font-variant-numeric:tabular-nums}
+  .transition-actions{display:flex;gap:10px;justify-content:center}
+
+  /* Settings Page */
+  .settings-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);margin-bottom:16px}
+  .settings-title{font-weight:700;font-size:.95rem;margin-bottom:16px}
+  .setting-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+  .setting-row:last-child{border-bottom:none}
+  .setting-label{font-size:.9rem;font-weight:500}
+  .setting-input{width:70px;text-align:center;font-size:1rem;font-weight:600;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg);color:var(--text);font-variant-numeric:tabular-nums}
+  .setting-input:focus{border-color:var(--primary);box-shadow:var(--focus-ring);outline:none}
+  .setting-unit{font-size:.8rem;color:var(--text2);margin-left:6px;min-width:20px}
+  .setting-right{display:flex;align-items:center}
+
+  /* Preset Chips */
+  .preset-section{margin-top:8px}
+  .preset-title{font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+  .preset-grid{display:flex;flex-wrap:wrap;gap:8px}
+  .preset-chip{padding:10px 16px;border:1.5px solid var(--border);border-radius:12px;font-size:.85rem;font-weight:500;cursor:pointer;background:var(--surface);transition:.15s;box-shadow:var(--shadow);min-height:44px;display:flex;align-items:center;gap:6px}
+  .preset-chip:hover{border-color:var(--primary);color:var(--primary);transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+  .preset-chip-sub{font-size:.7rem;color:var(--text2);font-weight:400}
+
+  /* Stats Page */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+  .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);text-align:center}
+  .stat-value{font-size:1.6rem;font-weight:800;color:var(--primary)}
+  .stat-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;font-weight:600}
+  .stat-sub{font-size:.8rem;color:var(--text2);margin-top:2px}
+  .h-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .h-title{font-size:.8rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+  .h-list{display:flex;flex-direction:column;gap:8px}
+  .h-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;gap:12px;transition:.15s}
+  .h-item:hover{box-shadow:var(--shadow)}
+  .h-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .h-dot.work{background:var(--danger)}
+  .h-dot.break{background:var(--primary)}
+  .h-info{flex:1;min-width:0}
+  .h-name{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .h-meta{font-size:.75rem;color:var(--text2)}
+  .h-dur{font-weight:700;font-size:.9rem;font-variant-numeric:tabular-nums}
+  .empty{text-align:center;padding:48px 20px;color:var(--text2)}
+  .empty p{font-size:.9rem}
+
+  /* Animations */
+  @keyframes bounce{
+    0%{transform:scale(1)}
+    20%{transform:scale(1.15)}
+    40%{transform:scale(0.92)}
+    60%{transform:scale(1.08)}
+    80%{transform:scale(0.97)}
+    100%{transform:scale(1)}
+  }
+  @keyframes leaf-wiggle{
+    0%,100%{transform:rotate(0deg)}
+    25%{transform:rotate(-10deg)}
+    75%{transform:rotate(10deg)}
+  }
+  @keyframes steam-rise{
+    0%{opacity:0;transform:translateY(0) scaleX(1)}
+    40%{opacity:.5}
+    100%{opacity:0;transform:translateY(-18px) scaleX(1.4)}
+  }
+  @keyframes glow-pulse{
+    0%,100%{filter:drop-shadow(0 0 20px rgba(239,68,68,.15))}
+    50%{filter:drop-shadow(0 0 35px rgba(239,68,68,.3))}
+  }
+  .svg-bounce svg{animation:bounce .6s ease}
+  .leaf-wiggle{animation:leaf-wiggle .4s ease 2;transform-origin:center bottom}
+  .steam-line{animation:steam-rise 2.2s ease-in-out infinite}
+  .steam-line:nth-child(2){animation-delay:.7s}
+  .steam-line:nth-child(3){animation-delay:1.4s}
+
+  /* Responsive */
+  @media(max-width:480px){
+    .header{padding:0 12px;flex-wrap:wrap;height:auto;min-height:50px;padding-top:8px;padding-bottom:8px;gap:4px}
+    .logo{font-size:.95rem;gap:5px;margin-right:auto}
+    .logo svg{width:20px;height:20px}
+    .nav{order:3;width:100%}
+    .nav-btn{padding:8px 0;font-size:.8rem;min-height:36px;flex:1;text-align:center}
+    .harvest{margin-right:0}
+    .harvest-tomato{width:14px;height:14px}
+    main{padding:16px 12px 80px}
+    .svg-wrap{width:180px;height:180px}
+    .time-display{font-size:2.6rem}
+    .transition-card{padding:28px 20px}
+    .stats-grid{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+
+<header class="header" role="banner">
+  <div class="logo" aria-label="뽀모도로 타이머">
+    <svg viewBox="0 0 200 200" fill="none" aria-hidden="true">
+      <path d="M100 172C55 172 18 148 18 108C18 68 52 42 100 45C148 42 182 68 182 108C182 148 145 172 100 172Z" fill="#e74c3c" stroke="#c0392b" stroke-width="6"/>
+      <path d="M94 45C78 24 50 22 44 36" stroke="#4a8c3f" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M106 45C122 24 150 22 156 36" stroke="#4a8c3f" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <line x1="100" y1="45" x2="100" y2="28" stroke="#5a7247" stroke-width="5" stroke-linecap="round"/>
+    </svg>
+    뽀모도로
+  </div>
+  <div class="harvest" id="harvest" aria-label="오늘 완료한 뽀모도로"></div>
+  <nav class="nav" aria-label="메인 탭">
+    <button class="nav-btn active" data-tab="timer" aria-current="page">타이머</button>
+    <button class="nav-btn" data-tab="settings">설정</button>
+    <button class="nav-btn" data-tab="stats">기록</button>
+  </nav>
+</header>
+
+<main>
+  <!-- TIMER PAGE -->
+  <section class="page active timer-page" id="page-timer" aria-label="뽀모도로 타이머">
+    <div class="phase-label" id="phase-label">준비</div>
+    <div class="svg-wrap" id="svg-wrap">
+      <svg id="timer-svg" viewBox="0 0 200 210" width="100%" height="100%"></svg>
+    </div>
+    <div class="time-display" id="time-display" role="timer" aria-live="polite">25:00</div>
+    <div class="cycle-dots" id="cycle-dots" aria-label="사이클 진행"></div>
+    <div class="controls" id="controls"></div>
+    <div class="sound-row">
+      <select id="sound-select" aria-label="알림음 선택"></select>
+      <button class="sound-preview" id="sound-preview" aria-label="알림음 미리듣기">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- SETTINGS PAGE -->
+  <section class="page" id="page-settings" aria-label="뽀모도로 설정">
+    <div class="settings-card">
+      <div class="settings-title">시간 설정</div>
+      <div class="setting-row">
+        <span class="setting-label">작업 시간</span>
+        <div class="setting-right"><input class="setting-input" id="set-work" type="number" min="1" max="120" value="25" aria-label="작업 시간(분)"><span class="setting-unit">분</span></div>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">짧은 휴식</span>
+        <div class="setting-right"><input class="setting-input" id="set-short" type="number" min="1" max="60" value="5" aria-label="짧은 휴식(분)"><span class="setting-unit">분</span></div>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">긴 휴식</span>
+        <div class="setting-right"><input class="setting-input" id="set-long" type="number" min="1" max="60" value="15" aria-label="긴 휴식(분)"><span class="setting-unit">분</span></div>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">사이클 수</span>
+        <div class="setting-right"><input class="setting-input" id="set-cycles" type="number" min="1" max="10" value="4" aria-label="사이클 수"><span class="setting-unit">회</span></div>
+      </div>
+    </div>
+    <div class="settings-card">
+      <div class="settings-title">빠른 프리셋</div>
+      <div class="preset-grid" id="preset-grid"></div>
+    </div>
+  </section>
+
+  <!-- STATS PAGE -->
+  <section class="page" id="page-stats" aria-label="기록 및 통계">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="h-header">
+      <div class="h-title">완료 기록</div>
+      <button class="btn btn-ghost btn-sm" id="btn-clear-history">전체 삭제</button>
+    </div>
+    <div class="h-list" id="history-list" role="list"></div>
+    <div class="empty" id="no-history" style="display:none">
+      <p>아직 완료된 기록이 없습니다</p>
+    </div>
+  </section>
+</main>
+
+<!-- Transition Overlay -->
+<div class="transition" id="transition" role="dialog" aria-modal="true">
+  <div class="transition-card">
+    <div class="transition-icon" id="trans-icon"></div>
+    <div class="transition-title" id="trans-title"></div>
+    <div class="transition-sub" id="trans-sub"></div>
+    <div class="transition-countdown" id="trans-countdown"></div>
+    <div class="transition-actions">
+      <button class="btn btn-primary" id="btn-trans-start">지금 시작</button>
+      <button class="btn btn-ghost" id="btn-trans-skip">건너뛰기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  AUDIO ENGINE
+// ════════════════════════════════════════
+const AC=window.AudioContext||window.webkitAudioContext;
+let actx;
+function ctx(){if(!actx)actx=new AC();if(actx.state==='suspended')actx.resume();return actx}
+const SOUNDS={
+  chime:{label:'차임',fn(){tone([523.25,659.25,783.99,1046.5],.18,.12,'sine',.25)}},
+  bell:{label:'벨',fn(){tone([880,698,880],.15,.15,'sine',.3)}},
+  alarm:{label:'알람',fn(){tone([800,600,800,600],.1,.08,'square',.2)}},
+  soft:{label:'소프트',fn(){tone([440,554,440],.25,.2,'sine',.2)}},
+  digital:{label:'디지털',fn(){tone([1200,900,1200],.08,.06,'sawtooth',.15)}},
+  marimba:{label:'마림바',fn(){tone([587.33,739.99,880,1174.66],.12,.1,'triangle',.3)}},
+};
+function tone(freqs,dur,gap,type,vol){
+  const c=ctx();let t=c.currentTime;
+  freqs.forEach(f=>{
+    const o=c.createOscillator(),g=c.createGain();
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur+.05);
+    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+.1);t+=dur+gap;
+  });
+}
+function playSound(key){SOUNDS[key]?.fn()}
+
+// ════════════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════════════
+const TOMATO_BODY='M100 172C55 172 18 148 18 108C18 68 52 42 100 45C148 42 182 68 182 108C182 148 145 172 100 172Z';
+const TOMATO_TOP=42,TOMATO_BOT=172;
+const CUP_BODY='M55 70L62 162Q68 178 100 178Q132 178 138 162L145 70Z';
+const CUP_RIM='M48 70Q100 62 152 70Q100 78 48 70Z';
+const CUP_HANDLE='M145 88C170 88 173 128 145 132';
+const CUP_TOP=70,CUP_BOT=178;
+
+const PRESETS=[
+  {name:'뽀모도로 클래식',work:25,short:5,long:15,cycles:4},
+  {name:'짧은 집중',work:15,short:3,long:10,cycles:4},
+  {name:'딥 워크',work:50,short:10,long:30,cycles:3},
+  {name:'스프린트',work:10,short:2,long:5,cycles:6},
+];
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let settings=loadJSON('mt_settings',{workMin:25,shortBreakMin:5,longBreakMin:15,cyclesPerSet:4,sound:'chime'});
+let historyData=loadJSON('mt_history',[]);
+let cycle={phase:'idle',round:1,status:'idle',totalSec:0,remainSec:0,startedAt:0,pausedRemain:0};
+let animId=null,tickId=null,transTimerId=null,transCount=5;
+let wavePhase=0;
+
+function loadJSON(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback}catch{return fallback}}
+function saveJSON(key,val){try{localStorage.setItem(key,JSON.stringify(val))}catch(e){console.warn('Storage:',e)}}
+
+// ════════════════════════════════════════
+//  SVG RENDERING
+// ════════════════════════════════════════
+function getProgressColor(p){
+  p=Math.max(0,Math.min(1,p));
+  let h,s,l;
+  if(p<0.5){h=120-p*2*90;s=55+p*2*20;l=40+p*2*8}
+  else{h=30-(p-0.5)*2*30;s=75+((p-0.5)*2)*10;l=48+((p-0.5)*2)*4}
+  return`hsl(${h},${s}%,${l}%)`
+}
+function getCoffeeColor(p){
+  p=Math.max(0,Math.min(1,p));
+  const l=38-p*10;
+  return`hsl(25,50%,${l}%)`
+}
+
+function generateWavePath(fillY,phase,amplitude,w){
+  let d='';
+  for(let x=0;x<=w;x+=2){
+    const y=fillY+Math.sin(x*0.04+phase)*amplitude;
+    d+=(x===0?'M':'L')+` ${x} ${y}`;
+  }
+  d+=` L${w} 250 L0 250Z`;
+  return d;
+}
+
+// SVG DOM cache — create elements once, update attributes per frame
+let svgMode=null; // 'tomato' | 'coffee'
+const NS='http://www.w3.org/2000/svg';
+
+function ensureTomatoDOM(svg){
+  if(svgMode==='tomato')return;
+  svgMode='tomato';
+  svg.innerHTML=`
+    <defs><clipPath id="tc"><path d="${TOMATO_BODY}"/></clipPath></defs>
+    <g clip-path="url(#tc)">
+      <rect class="t-bg" x="0" y="0" width="200" height="210" opacity=".18"/>
+      <path class="t-wave" fill="green"/>
+    </g>
+    <path class="t-glow" d="${TOMATO_BODY}" fill="none" stroke-width="3.5" opacity=".5"/>
+    <path d="${TOMATO_BODY}" fill="none" stroke="var(--tomato-outline)" stroke-width="2.5"/>
+    <g class="t-leaves">
+      <line x1="100" y1="44" x2="100" y2="26" stroke="var(--tomato-outline)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M96 44C80 24 52 20 44 34" stroke="var(--tomato-leaf)" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <path d="M104 44C120 24 148 20 156 34" stroke="var(--tomato-leaf)" stroke-width="5" stroke-linecap="round" fill="none"/>
+    </g>
+  `;
+}
+
+function ensureCoffeeDOM(svg){
+  if(svgMode==='coffee')return;
+  svgMode='coffee';
+  svg.innerHTML=`
+    <defs><clipPath id="cc"><path d="${CUP_BODY}"/></clipPath></defs>
+    <g class="c-steam" opacity=".4">
+      <path class="steam-line" d="M80 68Q75 50 82 38" stroke="var(--text2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <path class="steam-line" d="M100 65Q95 45 102 33" stroke="var(--text2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <path class="steam-line" d="M120 68Q115 50 122 38" stroke="var(--text2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    </g>
+    <g clip-path="url(#cc)">
+      <rect class="c-bg" x="0" y="0" width="200" height="210" opacity=".15"/>
+      <path class="c-wave"/>
+    </g>
+    <path d="${CUP_BODY}" fill="none" stroke="var(--coffee-body)" stroke-width="3"/>
+    <path d="${CUP_RIM}" fill="var(--coffee-body)" stroke="var(--coffee-body)" stroke-width="2"/>
+    <path d="${CUP_HANDLE}" fill="none" stroke="var(--coffee-body)" stroke-width="3.5" stroke-linecap="round"/>
+    <ellipse cx="100" cy="185" rx="52" ry="6" fill="var(--border)" opacity=".3"/>
+  `;
+}
+
+function renderTomatoSVG(progress,animPhase){
+  const svg=document.getElementById('timer-svg');
+  if(!svg)return;
+  ensureTomatoDOM(svg);
+  progress=Math.max(0,Math.min(1,progress));
+  const fillY=TOMATO_BOT-(TOMATO_BOT-TOMATO_TOP)*progress;
+  const amp=progress>0.02&&progress<0.98?4:0;
+  const color=getProgressColor(progress);
+  const outlineColor=getProgressColor(Math.min(1,progress+0.1));
+  const wavePath=generateWavePath(fillY,animPhase,amp,200);
+
+  const bg=svg.querySelector('.t-bg');
+  const wave=svg.querySelector('.t-wave');
+  const glow=svg.querySelector('.t-glow');
+  const leaves=svg.querySelector('.t-leaves');
+  if(bg){bg.setAttribute('y',fillY-6);bg.setAttribute('height',210-fillY+6);bg.setAttribute('fill',color)}
+  if(wave){wave.setAttribute('d',wavePath);wave.setAttribute('fill',color)}
+  if(glow){glow.setAttribute('stroke',outlineColor)}
+  if(leaves){
+    const shouldWiggle=cycle.status==='running'&&progress<0.05;
+    if(shouldWiggle&&!leaves.classList.contains('leaf-wiggle'))leaves.classList.add('leaf-wiggle');
+    else if(!shouldWiggle&&leaves.classList.contains('leaf-wiggle'))leaves.classList.remove('leaf-wiggle');
+  }
+}
+
+function renderCoffeeSVG(progress,animPhase){
+  const svg=document.getElementById('timer-svg');
+  if(!svg)return;
+  ensureCoffeeDOM(svg);
+  progress=Math.max(0,Math.min(1,progress));
+  const fillY=CUP_BOT-(CUP_BOT-CUP_TOP)*progress;
+  const amp=progress>0.02&&progress<0.98?3:0;
+  const color=getCoffeeColor(progress);
+  const wavePath=generateWavePath(fillY,animPhase,amp,200);
+
+  const bg=svg.querySelector('.c-bg');
+  const wave=svg.querySelector('.c-wave');
+  const steam=svg.querySelector('.c-steam');
+  if(bg){bg.setAttribute('y',fillY-4);bg.setAttribute('height',210-fillY+4);bg.setAttribute('fill',color)}
+  if(wave){wave.setAttribute('d',wavePath);wave.setAttribute('fill',color)}
+  if(steam){
+    const show=cycle.status==='running'||cycle.status==='paused';
+    steam.style.display=show?'':'none';
+  }
+}
+
+// ════════════════════════════════════════
+//  ANIMATION LOOP
+// ════════════════════════════════════════
+function startAnimLoop(){
+  cancelAnimationFrame(animId);
+  function loop(){
+    wavePhase+=0.06;
+    // Compute progress directly from performance.now() for smooth animation
+    let progress;
+    if(cycle.status==='running'&&cycle.totalSec>0){
+      const elapsed=(performance.now()-cycle.startedAt)/1000;
+      progress=Math.min(1,elapsed/cycle.totalSec);
+    } else {
+      progress=cycle.totalSec>0?(cycle.totalSec-cycle.remainSec)/cycle.totalSec:0;
+    }
+    if(isWorkPhase())renderTomatoSVG(progress,wavePhase);
+    else if(isBreakPhase())renderCoffeeSVG(progress,wavePhase);
+    animId=requestAnimationFrame(loop);
+  }
+  loop();
+}
+function stopAnimLoop(){cancelAnimationFrame(animId);animId=null}
+
+function renderStaticVisual(){
+  const progress=cycle.totalSec>0?(cycle.totalSec-cycle.remainSec)/cycle.totalSec:0;
+  if(cycle.phase==='idle')renderTomatoSVG(0,0);
+  else if(isWorkPhase())renderTomatoSVG(progress,wavePhase);
+  else renderCoffeeSVG(progress,wavePhase);
+}
+
+// ════════════════════════════════════════
+//  TIMER LOGIC (performance.now based)
+// ════════════════════════════════════════
+function startTimer(){
+  if(cycle.phase==='idle'){
+    cycle.phase='work';
+    cycle.round=1;
+    cycle.totalSec=settings.workMin*60;
+    cycle.remainSec=cycle.totalSec;
+  }
+  if(cycle.status==='finished'){
+    // Already set up by transition
+  }
+  ctx(); // ensure audio
+  cycle.status='running';
+  cycle.startedAt=performance.now()-(cycle.totalSec-cycle.remainSec)*1000;
+
+  clearInterval(tickId);
+  tickId=setInterval(()=>{
+    const elapsed=(performance.now()-cycle.startedAt)/1000;
+    cycle.remainSec=Math.max(0,cycle.totalSec-elapsed);
+    updateTimeDisplay();
+    if(cycle.remainSec<=0){
+      cycle.remainSec=0;
+      cycle.status='finished';
+      clearInterval(tickId);tickId=null;
+      onPhaseComplete();
+    }
+  },250);
+
+  startAnimLoop();
+  updateUI();
+}
+
+function pauseTimer(){
+  if(cycle.status!=='running')return;
+  cycle.status='paused';
+  clearInterval(tickId);tickId=null;
+  stopAnimLoop();
+  renderStaticVisual();
+  updateUI();
+}
+
+function resetTimer(){
+  cycle.status='idle';
+  cycle.phase='idle';
+  cycle.round=1;
+  cycle.totalSec=settings.workMin*60;
+  cycle.remainSec=cycle.totalSec;
+  clearInterval(tickId);tickId=null;
+  stopAnimLoop();
+  svgMode=null; // force DOM rebuild on next render
+  renderTomatoSVG(0,0);
+  updateUI();
+  document.title='뽀모도로 타이머';
+}
+
+function skipPhase(){
+  clearInterval(tickId);tickId=null;
+  stopAnimLoop();
+  advanceCycle(true);
+}
+
+// ════════════════════════════════════════
+//  CYCLE MANAGEMENT
+// ════════════════════════════════════════
+function isWorkPhase(){return cycle.phase==='work'}
+function isBreakPhase(){return cycle.phase==='shortBreak'||cycle.phase==='longBreak'}
+
+function onPhaseComplete(){
+  stopAnimLoop();
+  // Play sound
+  playSound(settings.sound);
+  setTimeout(()=>playSound(settings.sound),1200);
+  setTimeout(()=>playSound(settings.sound),2400);
+
+  // Notification
+  if('Notification' in window&&Notification.permission==='granted'){
+    const msg=isWorkPhase()?`워크 ${cycle.round} 완료!`:'휴식 완료!';
+    try{new Notification('뽀모도로',{body:msg})}catch{}
+  }
+
+  // Save history
+  saveHistory(cycle.phase,cycle.totalSec);
+
+  // Bounce animation
+  const wrap=document.getElementById('svg-wrap');
+  if(wrap){wrap.classList.add('svg-bounce');setTimeout(()=>wrap.classList.remove('svg-bounce'),700)}
+
+  // Final render at 100%
+  if(isWorkPhase())renderTomatoSVG(1,wavePhase);
+  else renderCoffeeSVG(1,wavePhase);
+
+  // Show transition
+  setTimeout(()=>showTransition(),800);
+  updateHarvest();
+}
+
+function advanceCycle(skipped){
+  hideTransition();
+  svgMode=null; // force DOM rebuild for tomato↔coffee switch
+  if(isWorkPhase()){
+    if(cycle.round>=settings.cyclesPerSet){
+      // Long break
+      cycle.phase='longBreak';
+      cycle.totalSec=settings.longBreakMin*60;
+    } else {
+      cycle.phase='shortBreak';
+      cycle.totalSec=settings.shortBreakMin*60;
+    }
+    if(skipped){
+      // Skip break entirely → go to next work or finish
+      if(cycle.round>=settings.cyclesPerSet){
+        resetTimer();
+        return;
+      }
+      cycle.round++;
+      cycle.phase='work';
+      cycle.totalSec=settings.workMin*60;
+    }
+  } else {
+    // Break finished → next work or done
+    if(cycle.phase==='longBreak'){
+      resetTimer();
+      return;
+    }
+    cycle.round++;
+    cycle.phase='work';
+    cycle.totalSec=settings.workMin*60;
+  }
+  cycle.remainSec=cycle.totalSec;
+  cycle.status='finished'; // ready to start
+  startTimer();
+}
+
+// ════════════════════════════════════════
+//  TRANSITION OVERLAY
+// ════════════════════════════════════════
+function showTransition(){
+  const el=document.getElementById('transition');
+  const icon=document.getElementById('trans-icon');
+  const title=document.getElementById('trans-title');
+  const sub=document.getElementById('trans-sub');
+  const countdown=document.getElementById('trans-countdown');
+
+  if(isWorkPhase()){
+    icon.textContent='🍅';
+    title.textContent=`워크 ${cycle.round} 완료!`;
+    if(cycle.round>=settings.cyclesPerSet){
+      sub.textContent=`다음: ${settings.longBreakMin}분 긴 휴식`;
+    } else {
+      sub.textContent=`다음: ${settings.shortBreakMin}분 짧은 휴식`;
+    }
+  } else {
+    icon.textContent='☕';
+    title.textContent='휴식 완료!';
+    if(cycle.phase==='longBreak'){
+      sub.textContent='세트 완료! 새로 시작할 준비가 되었습니다.';
+    } else {
+      sub.textContent=`다음: ${settings.workMin}분 작업 (${cycle.round+1}/${settings.cyclesPerSet})`;
+    }
+  }
+
+  transCount=5;
+  countdown.textContent=`자동 시작까지 ${transCount}초...`;
+  el.classList.add('active');
+
+  clearInterval(transTimerId);
+  transTimerId=setInterval(()=>{
+    transCount--;
+    if(transCount<=0){
+      clearInterval(transTimerId);
+      advanceCycle(false);
+    } else {
+      countdown.textContent=`자동 시작까지 ${transCount}초...`;
+    }
+  },1000);
+}
+function hideTransition(){
+  clearInterval(transTimerId);
+  document.getElementById('transition').classList.remove('active');
+}
+
+document.getElementById('btn-trans-start').addEventListener('click',()=>{
+  clearInterval(transTimerId);
+  advanceCycle(false);
+});
+document.getElementById('btn-trans-skip').addEventListener('click',()=>{
+  clearInterval(transTimerId);
+  advanceCycle(true);
+});
+
+// ════════════════════════════════════════
+//  UI UPDATES
+// ════════════════════════════════════════
+function fmt(sec){
+  sec=Math.max(0,Math.ceil(sec));
+  const m=Math.floor(sec/60),s=sec%60;
+  return`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTimeDisplay(){
+  const el=document.getElementById('time-display');
+  if(el)el.textContent=fmt(cycle.remainSec);
+  // Tab title
+  if(cycle.status==='running'){
+    const icon=isWorkPhase()?'🍅':'☕';
+    document.title=`${fmt(cycle.remainSec)} ${icon} 뽀모도로`;
+  }
+}
+
+function updateUI(){
+  updateTimeDisplay();
+  updatePhaseLabel();
+  updateCycleDots();
+  updateControls();
+  updateSvgWrapClass();
+}
+
+function updatePhaseLabel(){
+  const el=document.getElementById('phase-label');
+  if(!el)return;
+  el.className='phase-label';
+  if(cycle.phase==='idle'){el.textContent='준비';return}
+  if(isWorkPhase()){el.textContent=`워크 ${cycle.round}/${settings.cyclesPerSet}`;el.classList.add('work')}
+  else if(cycle.phase==='shortBreak'){el.textContent='짧은 휴식';el.classList.add('break')}
+  else if(cycle.phase==='longBreak'){el.textContent='긴 휴식';el.classList.add('break')}
+}
+
+function updateCycleDots(){
+  const el=document.getElementById('cycle-dots');
+  if(!el)return;
+  let html='';
+  for(let i=1;i<=settings.cyclesPerSet;i++){
+    let cls='cycle-dot';
+    if(i<cycle.round||(i===cycle.round&&cycle.status==='finished'&&isWorkPhase()))cls+=' done';
+    else if(i===cycle.round&&cycle.phase!=='idle'){cls+=' active';if(isWorkPhase())cls+=' work'}
+    html+=`<div class="${cls}"></div>`;
+  }
+  el.innerHTML=html;
+}
+
+function updateControls(){
+  const el=document.getElementById('controls');
+  if(!el)return;
+  let html='';
+  if(cycle.phase==='idle'){
+    html=`<button class="btn btn-primary btn-lg" id="btn-start">▶ 시작</button>`;
+  } else if(cycle.status==='running'){
+    html=`<button class="btn btn-ghost" id="btn-pause">⏸ 일시정지</button>
+           <button class="btn btn-ghost" id="btn-reset">↺ 초기화</button>
+           <button class="btn btn-ghost btn-sm" id="btn-skip">⏭ 건너뛰기</button>`;
+  } else if(cycle.status==='paused'){
+    html=`<button class="btn btn-primary" id="btn-resume">▶ 재개</button>
+           <button class="btn btn-ghost" id="btn-reset">↺ 초기화</button>`;
+  } else if(cycle.status==='finished'){
+    html=`<button class="btn btn-success" id="btn-reset">↺ 다시</button>`;
+  }
+  el.innerHTML=html;
+  attachControlEvents();
+}
+
+function attachControlEvents(){
+  const btnStart=document.getElementById('btn-start');
+  const btnPause=document.getElementById('btn-pause');
+  const btnResume=document.getElementById('btn-resume');
+  const btnReset=document.getElementById('btn-reset');
+  const btnSkip=document.getElementById('btn-skip');
+  if(btnStart)btnStart.onclick=()=>startTimer();
+  if(btnPause)btnPause.onclick=()=>pauseTimer();
+  if(btnResume)btnResume.onclick=()=>startTimer();
+  if(btnReset)btnReset.onclick=()=>resetTimer();
+  if(btnSkip)btnSkip.onclick=()=>skipPhase();
+}
+
+function updateSvgWrapClass(){
+  const el=document.getElementById('svg-wrap');
+  if(!el)return;
+  el.classList.remove('work','break');
+  if(isWorkPhase())el.classList.add('work');
+  else if(isBreakPhase())el.classList.add('break');
+}
+
+// ════════════════════════════════════════
+//  HARVEST COUNTER (mini tomatoes)
+// ════════════════════════════════════════
+function getTodayWorkCount(){
+  const today=new Date().toDateString();
+  return historyData.filter(h=>h.type==='work'&&new Date(h.completedAt).toDateString()===today).length;
+}
+
+function updateHarvest(){
+  const el=document.getElementById('harvest');
+  if(!el)return;
+  const count=getTodayWorkCount();
+  if(count===0){el.innerHTML='';return}
+  const maxIcons=Math.min(count,8);
+  let html='';
+  for(let i=0;i<maxIcons;i++){
+    html+=`<svg class="harvest-tomato" viewBox="0 0 200 200" aria-hidden="true">
+      <path d="M100 172C55 172 18 148 18 108C18 68 52 42 100 45C148 42 182 68 182 108C182 148 145 172 100 172Z" fill="#e74c3c"/>
+      <path d="M96 44C80 30 58 26 50 36" stroke="#4a8c3f" stroke-width="8" stroke-linecap="round" fill="none"/>
+      <path d="M104 44C120 30 142 26 150 36" stroke="#4a8c3f" stroke-width="8" stroke-linecap="round" fill="none"/>
+    </svg>`;
+  }
+  if(count>maxIcons)html+=`<span class="harvest-count">+${count-maxIcons}</span>`;
+  el.innerHTML=html;
+}
+
+// ════════════════════════════════════════
+//  HISTORY & STATS
+// ════════════════════════════════════════
+function saveHistory(phase,duration){
+  const type=phase==='work'?'work':'break';
+  historyData.unshift({name:type==='work'?`워크 ${cycle.round}`:(phase==='longBreak'?'긴 휴식':'짧은 휴식'),type,duration,completedAt:new Date().toISOString()});
+  if(historyData.length>200)historyData=historyData.slice(0,200);
+  saveJSON('mt_history',historyData);
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+function renderStats(){
+  const grid=document.getElementById('stats-grid');
+  const list=document.getElementById('history-list');
+  const noH=document.getElementById('no-history');
+  const clearBtn=document.getElementById('btn-clear-history');
+
+  if(historyData.length===0){grid.innerHTML='';list.innerHTML='';noH.style.display='block';clearBtn.style.display='none';return}
+  noH.style.display='none';clearBtn.style.display='';
+
+  const workItems=historyData.filter(h=>h.type==='work');
+  const total=workItems.length;
+  const totalSec=workItems.reduce((a,b)=>a+b.duration,0);
+  const today=new Date().toDateString();
+  const todayItems=workItems.filter(h=>new Date(h.completedAt).toDateString()===today);
+  const todayN=todayItems.length;
+  const todaySec=todayItems.reduce((a,b)=>a+b.duration,0);
+
+  const weekAgo=Date.now()-7*24*3600*1000;
+  const weekN=workItems.filter(h=>new Date(h.completedAt).getTime()>=weekAgo).length;
+
+  const avgMin=total>0?Math.round(totalSec/total/60):0;
+
+  grid.innerHTML=`
+    <div class="stat-card"><div class="stat-value">${todayN}</div><div class="stat-label">오늘 뽀모도로</div><div class="stat-sub">${fmtDur(todaySec)}</div></div>
+    <div class="stat-card"><div class="stat-value">${weekN}</div><div class="stat-label">이번 주</div></div>
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">전체 완료</div><div class="stat-sub">${fmtDur(totalSec)}</div></div>
+    <div class="stat-card"><div class="stat-value">${avgMin}분</div><div class="stat-label">평균 작업</div></div>
+  `;
+
+  list.innerHTML=historyData.slice(0,30).map(h=>{
+    const d=new Date(h.completedAt);
+    const ds=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return`<div class="h-item" role="listitem"><div class="h-dot ${h.type||'work'}"></div><div class="h-info"><div class="h-name">${esc(h.name||'워크')}</div><div class="h-meta">${ds}</div></div><div class="h-dur">${fmtDur(h.duration)}</div></div>`;
+  }).join('');
+}
+
+function fmtDur(sec){
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  if(h>0)return`${h}시간 ${m}분`;
+  if(m>0)return`${m}분 ${s}초`;
+  return`${s}초`;
+}
+
+document.getElementById('btn-clear-history').addEventListener('click',()=>{
+  if(historyData.length===0)return;
+  if(!confirm('모든 기록을 삭제하시겠습니까?'))return;
+  historyData=[];saveJSON('mt_history',[]);
+  renderStats();updateHarvest();
+});
+
+// ════════════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════════════
+function loadSettings(){
+  document.getElementById('set-work').value=settings.workMin;
+  document.getElementById('set-short').value=settings.shortBreakMin;
+  document.getElementById('set-long').value=settings.longBreakMin;
+  document.getElementById('set-cycles').value=settings.cyclesPerSet;
+}
+
+function saveSettings(){
+  settings.workMin=Math.max(1,parseInt(document.getElementById('set-work').value)||25);
+  settings.shortBreakMin=Math.max(1,parseInt(document.getElementById('set-short').value)||5);
+  settings.longBreakMin=Math.max(1,parseInt(document.getElementById('set-long').value)||15);
+  settings.cyclesPerSet=Math.max(1,parseInt(document.getElementById('set-cycles').value)||4);
+  saveJSON('mt_settings',settings);
+  // Update idle timer if not running
+  if(cycle.phase==='idle'){
+    cycle.totalSec=settings.workMin*60;
+    cycle.remainSec=cycle.totalSec;
+    updateTimeDisplay();
+    updateCycleDots();
+  }
+}
+
+['set-work','set-short','set-long','set-cycles'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',saveSettings);
+});
+
+function renderPresets(){
+  const grid=document.getElementById('preset-grid');
+  grid.innerHTML=PRESETS.map((p,i)=>`
+    <div class="preset-chip" data-preset="${i}" tabindex="0">${esc(p.name)} <span class="preset-chip-sub">${p.work}/${p.short}/${p.long}</span></div>
+  `).join('');
+  grid.onclick=e=>{
+    const chip=e.target.closest('[data-preset]');
+    if(!chip)return;
+    const p=PRESETS[+chip.dataset.preset];
+    if(!p)return;
+    document.getElementById('set-work').value=p.work;
+    document.getElementById('set-short').value=p.short;
+    document.getElementById('set-long').value=p.long;
+    document.getElementById('set-cycles').value=p.cycles;
+    saveSettings();
+  };
+  grid.onkeydown=e=>{
+    if(e.key==='Enter'||e.key===' '){
+      e.preventDefault();
+      const chip=e.target.closest('[data-preset]');
+      if(chip)chip.click();
+    }
+  };
+}
+
+// Sound selector
+function renderSoundSelect(){
+  const sel=document.getElementById('sound-select');
+  sel.innerHTML=Object.entries(SOUNDS).map(([k,v])=>`<option value="${k}"${k===settings.sound?' selected':''}>${v.label}</option>`).join('');
+  sel.onchange=e=>{settings.sound=e.target.value;saveJSON('mt_settings',settings)};
+}
+document.getElementById('sound-preview').addEventListener('click',()=>{playSound(settings.sound)});
+
+// ════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  b.addEventListener('click',()=>switchTab(b.dataset.tab));
+});
+function switchTab(tab){
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    const isActive=b.dataset.tab===tab;
+    b.classList.toggle('active',isActive);
+    if(isActive)b.setAttribute('aria-current','page');
+    else b.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${tab}`));
+  if(tab==='settings'){loadSettings();renderPresets()}
+  if(tab==='stats')renderStats();
+}
+
+// ════════════════════════════════════════
+//  PERSISTENCE (beforeunload)
+// ════════════════════════════════════════
+window.addEventListener('beforeunload',()=>{
+  if(cycle.phase!=='idle'){
+    saveJSON('mt_cycle',{phase:cycle.phase,round:cycle.round,totalSec:cycle.totalSec,remainSec:cycle.remainSec,status:cycle.status,savedAt:Date.now()});
+  } else {
+    try{localStorage.removeItem('mt_cycle')}catch{}
+  }
+});
+
+function restoreCycle(){
+  const saved=loadJSON('mt_cycle',null);
+  if(!saved||!saved.phase||saved.phase==='idle')return;
+  // Only restore if saved within last 2 hours
+  if(Date.now()-saved.savedAt>2*3600*1000)return;
+  cycle.phase=saved.phase;
+  cycle.round=saved.round;
+  cycle.totalSec=saved.totalSec;
+  // Account for time passed if was running
+  if(saved.status==='running'){
+    const elapsed=(Date.now()-saved.savedAt)/1000;
+    cycle.remainSec=Math.max(0,saved.remainSec-elapsed);
+    if(cycle.remainSec<=0){
+      cycle.remainSec=0;
+      cycle.status='finished';
+      renderStaticVisual();
+      updateUI();
+      return;
+    }
+    cycle.status='paused'; // restore as paused, user can resume
+  } else {
+    cycle.remainSec=saved.remainSec;
+    cycle.status=saved.status;
+  }
+  renderStaticVisual();
+  updateUI();
+  try{localStorage.removeItem('mt_cycle')}catch{}
+}
+
+// ════════════════════════════════════════
+//  NOTIFICATION
+// ════════════════════════════════════════
+if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+
+// ════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════
+cycle.totalSec=settings.workMin*60;
+cycle.remainSec=cycle.totalSec;
+renderTomatoSVG(0,0);
+renderSoundSelect();
+updateUI();
+updateHarvest();
+restoreCycle();
+</script>
+</body>
+</html>
