@@ -44,8 +44,8 @@
 
 ```bash
 # 프로젝트 클론
-git clone https://github.com/corazzon/cc_timer.git
-cd cc_timer
+git clone https://github.com/corazzon/pomodoro-by-gstack.git
+cd pomodoro-by-gstack
 
 # 브라우저에서 열기
 open index.html
